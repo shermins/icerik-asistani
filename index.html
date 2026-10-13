@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Öğretmenler için ders oyunu ve simülasyon fikirlerini yapay zekâya hazır prompta dönüştüren araç.">
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+<title>Etkileşimli İçerik Asistanı</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: kareli defter zemini; solda tasarım formu, sağda yapışkan "prompt kâğıdı". Telefonda tek sütun. */
+:root{
+  --paper:#f5f6f1; --grid:rgba(39,71,214,.07); --card:#ffffff; --ink:#1b2130; --muted:#5d6577;
+  --line:#dfe2e8; --accent:#2747d6; --accent-ink:#ffffff; --accent-soft:#e6ebff;
+  --mark:#ffd84a; --ok:#1f8a5b; --warn:#b26b00; --bad:#c43c3c; --code-bg:#fbfbf7;
+  --f-display:"Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --f-body:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#12171a; --grid:rgba(160,220,200,.05); --card:#1a2125; --ink:#e7ece9; --muted:#9aa6a3;
+  --line:#2c3639; --accent:#8fa6ff; --accent-ink:#0d1330; --accent-soft:#232c4d;
+  --mark:#e9c23a; --ok:#5fcf9a; --warn:#f0b04a; --bad:#ff8a80; --code-bg:#151b1e; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --paper:#12171a; --grid:rgba(160,220,200,.05); --card:#1a2125; --ink:#e7ece9; --muted:#9aa6a3;
+  --line:#2c3639; --accent:#8fa6ff; --accent-ink:#0d1330; --accent-soft:#232c4d;
+  --mark:#e9c23a; --ok:#5fcf9a; --warn:#f0b04a; --bad:#ff8a80; --code-bg:#151b1e; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--f-body); font-size:15px; line-height:1.5;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;
+}
+.wrap{max-width:1240px; margin:0 auto; padding-inline:20px; padding-block:24px 48px}
+header.top{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px}
+.brand h1{font-family:var(--f-display); font-weight:800; font-size:clamp(26px,4vw,38px); line-height:1.05; margin:0; letter-spacing:-.01em; text-wrap:balance}
+.brand h1 .hl{background:linear-gradient(transparent 58%, var(--mark) 58%, var(--mark) 92%, transparent 92%); padding:0 .1em}
+.brand p{margin:6px 0 0; color:var(--muted); max-width:60ch}
+.status-pill{font-size:12.5px; color:var(--muted); border:1px solid var(--line); background:var(--card); padding:6px 10px; border-radius:999px; display:inline-flex; gap:8px; align-items:center}
+.status-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.status-pill.on .dot{background:var(--ok)}
+
+nav.tabs{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px; border-bottom:2px solid var(--line)}
+nav.tabs button{font:600 14.5px var(--f-body); color:var(--muted); background:none; border:0; padding:10px 14px; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px}
+nav.tabs button[aria-selected="true"]{color:var(--ink); border-color:var(--accent)}
+nav.tabs button:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .chip:focus-within{outline:2px solid var(--accent); outline-offset:2px}
+nav.tabs .count{font:500 11px var(--f-mono); background:var(--accent-soft); color:var(--accent); border-radius:999px; padding:1px 7px; margin-left:4px}
+
+.grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); gap:20px; align-items:start}
+@media (max-width:900px){ .grid{grid-template-columns:minmax(0,1fr)} }
+
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:20px}
+.section + .section{margin-top:22px; padding-top:20px; border-top:1px dashed var(--line)}
+.section h2{font-family:var(--f-display); font-size:17px; font-weight:700; margin:0 0 12px; display:flex; gap:10px; align-items:baseline}
+.section h2 .step{font:500 12px var(--f-mono); color:var(--accent)}
+label.lbl{display:block; font-weight:600; font-size:13.5px; margin-bottom:5px}
+.hint{font-size:12.5px; color:var(--muted); margin-top:4px}
+.row{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px}
+.field + .field, .row + .field, .field + .row{margin-top:12px}
+input[type=text], input[type=number], select, textarea{
+  width:100%; font:inherit; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:9px 11px;
+}
+textarea{resize:vertical; min-height:70px}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chip{position:relative; display:inline-flex}
+.chip input{position:absolute; opacity:0; inset:0; cursor:pointer}
+.chip span{display:inline-flex; gap:6px; align-items:center; padding:7px 12px; border-radius:999px; border:1px solid var(--line); background:var(--paper); font-size:13.5px; font-weight:500; user-select:none}
+.chip input:checked + span{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.themes{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px}
+.theme{position:relative; border:1px solid var(--line); border-radius:10px; overflow:hidden; cursor:pointer; background:var(--paper)}
+.theme input{position:absolute; opacity:0}
+.theme .sw{height:46px; display:flex}
+.theme .sw i{flex:1}
+.theme .nm{font-size:12.5px; font-weight:600; padding:7px 9px}
+.theme:has(input:checked){outline:2px solid var(--accent); outline-offset:1px}
+
+.btn{font:600 14px var(--f-body); border-radius:9px; padding:10px 15px; cursor:pointer; border:1px solid var(--line); background:var(--card); color:var(--ink); display:inline-flex; gap:8px; align-items:center}
+.btn.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.5; cursor:not-allowed}
+.btns{display:flex; flex-wrap:wrap; gap:8px}
+
+.paper{position:sticky; top:calc(env(safe-area-inset-top,0px) + 14px)}
+.paper-head{display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; align-items:center; margin-bottom:12px}
+.paper-head h2{font-family:var(--f-display); font-size:19px; margin:0}
+.meter{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted)}
+.meter .bar{width:120px; height:8px; background:var(--line); border-radius:99px; overflow:hidden}
+.meter .bar i{display:block; height:100%; background:var(--ok); width:0; transition:width .3s}
+.checks{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px}
+.checks span{font:500 11.5px var(--f-mono); padding:3px 8px; border-radius:6px; background:var(--paper); border:1px solid var(--line); color:var(--muted)}
+.checks span.on{color:var(--ok); border-color:var(--ok)}
+#out, #aOut{width:100%; min-height:460px; font:13px/1.6 var(--f-mono); background:var(--code-bg); border:1px solid var(--line); border-radius:10px; padding:14px; color:var(--ink); white-space:pre-wrap}
+#aOut{min-height:340px}
+.note{font-size:13px; color:var(--muted); margin-top:10px; min-height:1.3em}
+.note.bad{color:var(--bad)} .note.ok{color:var(--ok)}
+.example-tag{font:600 11px var(--f-mono); text-transform:uppercase; letter-spacing:.06em; background:var(--mark); color:#2a2300; padding:3px 8px; border-radius:5px}
+
+.drop{display:block; width:100%; border:2px dashed var(--line); border-radius:12px; padding:22px; text-align:center; background:var(--paper); cursor:pointer}
+.drop.over{border-color:var(--accent); background:var(--accent-soft)}
+.drop strong{font-family:var(--f-display); font-size:17px; display:block; margin-bottom:4px}
+.facts{display:grid; grid-template-columns:minmax(110px,auto) minmax(0,1fr); gap:8px 14px; font-size:13.5px}
+.facts dt{color:var(--muted); font-weight:600}
+.facts dd{margin:0; min-width:0; overflow-wrap:anywhere}
+.tag{display:inline-block; font:500 12px var(--f-mono); background:var(--accent-soft); color:var(--accent); border-radius:6px; padding:2px 7px; margin:0 4px 4px 0}
+.swatch{display:inline-flex; align-items:center; gap:5px; font:500 11.5px var(--f-mono); margin:0 8px 4px 0}
+.swatch i{width:16px; height:16px; border-radius:4px; border:1px solid var(--line); display:inline-block}
+.empty{color:var(--muted); font-size:14px; padding:18px; text-align:center; border:1px dashed var(--line); border-radius:10px}
+
+.saved-list{display:grid; gap:12px}
+.saved-item{display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center}
+.saved-item h3{font-family:var(--f-display); font-size:16px; margin:0}
+.saved-item p{margin:2px 0 0; font-size:13px; color:var(--muted)}
+.toast{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 18px); transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:10px 16px; border-radius:10px; font-size:14px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .2s}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Etkileşimli <span class="hl">İçerik</span> Asistanı</h1>
+    </div>
+    <div class="status-pill" id="aiPill"><span class="dot"></span><span id="aiPillText">Claude bağlantısı kontrol ediliyor</span></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="t-design" aria-selected="true" data-tab="design">Yeni İçerik Tasarla</button>
+    <button role="tab" id="t-analyze" aria-selected="false" data-tab="analyze">HTML'den Prompt Çıkar</button>
+    <button role="tab" id="t-saved" aria-selected="false" data-tab="saved">Kayıtlı Promptlar <span class="count" id="savedCount">0</span></button>
+  </nav>
+
+  <!-- ================= TASARLA ================= -->
+  <section id="p-design" class="grid">
+    <form class="card" id="form" autocomplete="off">
+      <div class="section">
+        <h2><span class="step">01</span> Ne yapmak istiyorsun?</h2>
+        <label class="lbl">İçerik türü</label>
+        <div class="chips" id="typeChips"></div>
+        <div class="row" style="margin-top:12px">
+          <div><label class="lbl" for="f-branch">Ders</label><select id="f-branch"></select></div>
+          <div><label class="lbl" for="f-grade">Sınıf</label><select id="f-grade"></select></div>
+        </div>
+        <div class="field"><label class="lbl" for="f-name">İçeriğin adı</label><input type="text" id="f-name" placeholder="Örn: Kesir Laboratuvarı"></div>
+        <div class="field"><label class="lbl" for="f-topic">Konu</label><input type="text" id="f-topic" placeholder="Örn: Kesirlerde pay ve payda"></div>
+        <div class="field"><label class="lbl" for="f-goal">Kazanım / öğrenci ne öğrenecek?</label><textarea id="f-goal" rows="2"></textarea></div>
+        <div class="field"><label class="lbl" for="f-misc">Hedeflenen kavram yanılgısı <span style="font-weight:400;color:var(--muted)">(isteğe bağlı)</span></label><input type="text" id="f-misc" placeholder="Örn: Eşit olmayan parçalar da kesir sanılır"></div>
+      </div>
+
+      <div class="section">
+        <h2><span class="step">02</span> Öğrenci nasıl etkileşecek?</h2>
+        <div class="chips" id="interChips"></div>
+        <p class="hint">Kamera seçilse bile fare/dokunma yedeği prompta otomatik eklenir; kamerasız sınıflarda oyun yine çalışır.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="step">03</span> Oyun akışı</h2>
+        <div class="row">
+          <div><label class="lbl" for="f-count">Görev / seviye sayısı</label><input type="number" id="f-count" min="1" max="20"></div>
+          <div><label class="lbl" for="f-time">Tahmini süre (dk)</label><input type="number" id="f-time" min="3" max="80"></div>
+        </div>
+        <div class="field"><label class="lbl" for="f-levels">Görevler (her satıra bir tane)</label><textarea id="f-levels" rows="4"></textarea><p class="hint">Boş bırakırsan yapay zekâdan kolaydan zora görev listesi üretmesi istenir.</p></div>
+        <div class="field"><label class="lbl" for="f-success">Başarı ve hata durumunda ne olsun?</label><textarea id="f-success" rows="2"></textarea></div>
+      </div>
+
+      <div class="section">
+        <h2><span class="step">04</span> Görünüm</h2>
+        <div class="themes" id="themeCards"></div>
+      </div>
+
+      <div class="section">
+        <h2><span class="step">05</span> Geri bildirim ve ekler</h2>
+        <div class="chips" id="fbChips"></div>
+        <div class="field"><label class="lbl" for="f-extra">Ek istekler</label><textarea id="f-extra" rows="2" placeholder="Örn: Sonunda öğretmen için kısa bir sınıf içi kullanım notu göster"></textarea></div>
+        <div class="field"><label class="lbl" for="f-target">Promptu nerede kullanacaksın?</label>
+          <select id="f-target"><option>Claude</option><option>ChatGPT</option><option>Gemini</option><option>Herhangi bir yapay zekâ</option></select></div>
+      </div>
+
+      <div class="section btns">
+        <button type="button" class="btn ghost" id="btnClear">Formu temizle</button>
+        <button type="button" class="btn ghost" id="btnExample">Örneği yükle</button>
+      </div>
+    </form>
+
+    <aside class="paper card">
+      <div class="paper-head">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><h2>Üretilen prompt</h2><span class="example-tag" id="exTag">Örnek</span></div>
+        <div class="meter"><span id="meterText">0/8</span><span class="bar"><i id="meterBar"></i></span></div>
+      </div>
+      <div class="checks" id="checks"></div>
+      <textarea id="out" spellcheck="false" aria-label="Üretilen prompt"></textarea>
+      <div class="btns" style="margin-top:12px">
+        <button class="btn primary" id="btnCopy">Kopyala</button>
+        <button class="btn" id="btnEnrich" hidden>Claude ile zenginleştir</button>
+        <button class="btn" id="btnStop" hidden>Durdur</button>
+        <button class="btn" id="btnSave">Kaydet</button>
+      </div>
+      <p class="note" id="note">Form her değiştiğinde prompt kendiliğinden güncellenir. Metni burada da düzenleyebilirsin.</p>
+    </aside>
+  </section>
+
+  <!-- ================= ANALİZ ================= -->
+  <section id="p-analyze" class="grid" hidden>
+    <div class="card">
+      <div class="section">
+        <h2><span class="step">01</span> HTML dosyasını ver</h2>
+        <label class="drop" id="drop" for="fileIn">
+          <strong>Dosyayı buraya sürükle ya da tıklayıp seç</strong>
+          <span class="hint">.html dosyası · dosya yalnızca bu sayfada okunur</span>
+        </label>
+        <input type="file" id="fileIn" accept=".html,.htm,text/html" hidden>
+        <div class="field" style="margin-top:12px"><label class="lbl" for="pasteIn">…ya da kodu yapıştır</label><textarea id="pasteIn" rows="5" spellcheck="false" style="font:12.5px var(--f-mono)" placeholder="<!DOCTYPE html> ..."></textarea></div>
+        <div class="btns" style="margin-top:10px"><button class="btn primary" id="btnScan">Analiz et</button></div>
+      </div>
+      <div class="section">
+        <h2><span class="step">02</span> Dosyada bulunanlar</h2>
+        <div id="facts"><div class="empty">Bir dosya yüklediğinde başlık, kullanılan kütüphaneler, etkileşim türleri, renk paleti ve yazı tipleri burada listelenir.</div></div>
+        <div class="btns" style="margin-top:12px"><button class="btn" id="btnToForm" disabled>Bulunanları tasarım formuna aktar</button></div>
+      </div>
+    </div>
+
+    <aside class="paper card">
+      <div class="paper-head"><h2>Yeniden üretim promptu</h2><span class="hint" id="aMode"></span></div>
+      <textarea id="aOut" spellcheck="false" aria-label="Analiz promptu" placeholder="Analizden sonra prompt burada belirir."></textarea>
+      <div class="btns" style="margin-top:12px">
+        <button class="btn primary" id="aCopy" disabled>Kopyala</button>
+        <button class="btn" id="aDeep" hidden disabled>Claude ile derin analiz</button>
+        <button class="btn" id="aStop" hidden>Durdur</button>
+        <button class="btn" id="aSave" disabled>Kaydet</button>
+      </div>
+      <p class="note" id="aNote">Hızlı taslak tarayıcıda hemen hazırlanır. Derin analiz, oyunun akışını ve seviyelerini de okuyup daha ayrıntılı bir prompt yazar.</p>
+    </aside>
+  </section>
+
+  <!-- ================= KAYITLI ================= -->
+  <section id="p-saved" hidden>
+    <div class="card"><div class="saved-list" id="savedList"></div></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ---------- veriler ---------- */
+const TYPES = ["Oyun","Simülasyon","Sanal Laboratuvar","Sürükle-Bırak Etkinliği","Bilgi Yarışması","Etkileşimli Hikâye"];
+const BRANCHES = ["Matematik","Fen Bilimleri","Fizik","Kimya","Biyoloji","Türkçe","Türk Dili ve Edebiyatı","Sosyal Bilgiler","Tarih","Coğrafya","İngilizce","Bilişim Teknolojileri","Görsel Sanatlar","Müzik","Okul Öncesi","Sınıf Öğretmenliği","Diğer"];
+const GRADES = ["Okul Öncesi","1. Sınıf","2. Sınıf","3. Sınıf","4. Sınıf","5. Sınıf","6. Sınıf","7. Sınıf","8. Sınıf","9. Sınıf","10. Sınıf","11. Sınıf","12. Sınıf","Yetişkin"];
+const INTER = {
+  pointer:{label:"Fare / dokunma", rule:"Fare ve dokunmatik ekran: pointer olaylarıyla tut-sürükle-bırak; tıklanabilir alanlar en az 44 px."},
+  hand:{label:"Kamera ile el takibi", rule:"Kamera ile el takibi: MediaPipe Hands (cdn.jsdelivr.net/npm/@mediapipe/hands). Başparmak (landmark 4) ve işaret parmağı (landmark 8) orta noktası imleçtir. Çimdik algılaması el boyutuna göre normalize edilsin (bilek–orta parmak kökü mesafesi) ve histerezisli olsun: kapanma eşiği 0,52, açılma eşiği 0,78. Parmak konumları lerp ile yumuşatılsın (yaklaşık 0,5). El 0,7 saniyeden uzun kaybolursa tutulan nesne yerine dönsün. Kamera görüntüsü aynalanmış ve yarı saydam (%30–45) arka plan olarak çizilsin. Overlay düğmeleri de çimdikle basılabilsin."},
+  keyboard:{label:"Klavye", rule:"Klavye: ok tuşları ve Enter/Boşluk ile tüm etkileşimler yapılabilsin; odaklanan öğe belirgin görünsün."},
+  sliders:{label:"Kaydırıcılar", rule:"Kaydırıcılar: her parametre için etiketli range girişi, anlık değer göstergesi ve birimi; değer değişince sahne hemen güncellensin."},
+  voice:{label:"Sesli okuma", rule:"Sesli okuma: görev metinleri ve geri bildirimler speechSynthesis ile Türkçe (tr-TR) okunabilsin; açma/kapama düğmesi olsun."}
+};
+const THEMES = {
+  neon:{name:"Gece laboratuvarı", sw:["#07111f","#0c2440","#64e9ff","#ff873d"], desc:"Koyu lacivert zemin (#07111f), cam efektli yarı saydam paneller (backdrop-filter blur), turkuaz parlama ve kenarlıklar (#64e9ff), sıcak vurgu rengi turuncu-sarı gradyan (#ffe778 → #ff873d). Başlık paneli sol üstte, görev paneli sağ üstte, yönerge paneli alt ortada."},
+  notebook:{name:"Aydınlık defter", sw:["#f5f6f1","#ffffff","#2747d6","#ffd84a"], desc:"Açık kareli defter zemini (#f5f6f1, 24 px ızgara), beyaz kartlar, mürekkep mavisi vurgu (#2747d6), fosforlu sarı işaretleme (#ffd84a). Sade, okunaklı, akıllı tahtada net görünen tasarım."},
+  chalk:{name:"Tebeşir tahtası", sw:["#1f3a2e","#2a4a3b","#f2f0e6","#ffd166"], desc:"Koyu yeşil yazı tahtası zemini (#1f3a2e), tebeşir beyazı çizgiler ve yazılar (#f2f0e6), hafif tebeşir dokusu, sarı tebeşir vurgu (#ffd166). El çizimi hissi veren kenarlar."},
+  cartoon:{name:"Canlı çizgi film", sw:["#fff6e5","#ff6b6b","#4ecdc4","#ffe66d"], desc:"Sıcak krem zemin (#fff6e5), kalın koyu kontur çizgili yuvarlak şekiller, mercan (#ff6b6b), turkuaz (#4ecdc4) ve sarı (#ffe66d) dolgu; zıplayan, yaylanan animasyonlar. Küçük yaş grubuna uygun."}
+};
+const FB = {
+  sound:{label:"Ses efektleri", rule:"Web Audio API ile kısa ses efektleri: tutma, bırakma, doğru (yükselen ton), yanlış (alçak ton), görev bitişi (kısa melodi). Ses ilk kullanıcı etkileşiminden sonra başlasın; sessize alma düğmesi olsun."},
+  particles:{label:"Parçacık efekti", rule:"Doğru hamlede küçük, görev bitince büyük parçacık patlaması (canvas)."},
+  score:{label:"Puan ve ilerleme", rule:"Üstte görev sayacı (Görev 2 / 5), ilerleme noktaları ve anlık puan; oyun sonunda özet: doğru sayısı, hatalı deneme, kullanılan ipucu."},
+  hint:{label:"İpucu düğmesi", rule:"Her görev için kademeli ipucu: önce yönlendirici soru, ikinci basışta daha açık ipucu. Kullanılan ipucu sayılsın."},
+  fact:{label:"Bilgi notu", rule:"Her görev tamamlanınca başarı kartında kavramı pekiştiren 1–2 cümlelik ilginç bilgi ve \"Sonraki Görev →\" düğmesi."},
+  teacher:{label:"Öğretmen notu", rule:"Başlangıç ekranında küçük \"Öğretmen için\" bağlantısı: kazanım, süre, sınıfta kullanım önerisi ve tartışma soruları."}
+};
+const EXAMPLE = {
+  type:"Oyun", branch:"Matematik", grade:"4. Sınıf", name:"Kesir Laboratuvarı",
+  topic:"Kesirlerde pay ve payda", goal:"Öğrenci bir bütünün eş parçalara bölündüğünü, paydanın parça sayısını, payın seçilen parça sayısını gösterdiğini deneyimleyerek açıklar.",
+  misc:"Eş olmayan parçalara bölünmüş bütün de kesir sanılır.",
+  inter:["pointer","hand"], count:5, time:15,
+  levels:"1/2\n2/3\n3/4\n5/8\nDenk kesir: 2/4 = 1/2",
+  success:"Doğru dilim daireye oturur ve parlar. Yanlış yere bırakılan dilim başlangıç yerine döner ve kısa bir uyarı çıkar.",
+  theme:"neon", fb:["sound","particles","score","fact"], extra:"", target:"Claude"
+};
+const BLANK = {type:"Oyun",branch:"Matematik",grade:"5. Sınıf",name:"",topic:"",goal:"",misc:"",inter:["pointer"],count:4,time:20,levels:"",success:"",theme:"notebook",fb:["sound","score"],extra:"",target:"Claude"};
+
+/* ---------- form kurulumu ---------- */
+function chip(group, value, label, type){
+  return `<label class="chip"><input type="${type}" name="${group}" value="${value}" id="${group}-${value}"><span>${label}</span></label>`;
+}
+$("typeChips").innerHTML = TYPES.map((t,i)=>chip("type",t,t,"radio")).join("");
+$("interChips").innerHTML = Object.entries(INTER).map(([k,v])=>chip("inter",k,v.label,"checkbox")).join("");
+$("fbChips").innerHTML = Object.entries(FB).map(([k,v])=>chip("fb",k,v.label,"checkbox")).join("");
+$("themeCards").innerHTML = Object.entries(THEMES).map(([k,v])=>`<label class="theme"><input type="radio" name="theme" value="${k}" id="theme-${k}"><div class="sw">${v.sw.map(c=>`<i style="background:${c}"></i>`).join("")}</div><div class="nm">${v.name}</div></label>`).join("");
+$("f-branch").innerHTML = BRANCHES.map(b=>`<option>${b}</option>`).join("");
+$("f-grade").innerHTML = GRADES.map(g=>`<option>${g}</option>`).join("");
+
+function setForm(d){
+  document.querySelectorAll('[name=type]').forEach(i=>i.checked=i.value===d.type);
+  document.querySelectorAll('[name=theme]').forEach(i=>i.checked=i.value===d.theme);
+  document.querySelectorAll('[name=inter]').forEach(i=>i.checked=d.inter.includes(i.value));
+  document.querySelectorAll('[name=fb]').forEach(i=>i.checked=d.fb.includes(i.value));
+  $("f-branch").value=d.branch; $("f-grade").value=d.grade; $("f-name").value=d.name; $("f-topic").value=d.topic;
+  $("f-goal").value=d.goal; $("f-misc").value=d.misc; $("f-count").value=d.count; $("f-time").value=d.time;
+  $("f-levels").value=d.levels; $("f-success").value=d.success; $("f-extra").value=d.extra; $("f-target").value=d.target;
+}
+function getForm(){
+  const val = n => (document.querySelector(`[name=${n}]:checked`)||{}).value;
+  const vals = n => [...document.querySelectorAll(`[name=${n}]:checked`)].map(i=>i.value);
+  return {type:val("type")||"Oyun", theme:val("theme")||"notebook", inter:vals("inter"), fb:vals("fb"),
+    branch:$("f-branch").value, grade:$("f-grade").value, name:$("f-name").value.trim(), topic:$("f-topic").value.trim(),
+    goal:$("f-goal").value.trim(), misc:$("f-misc").value.trim(), count:parseInt($("f-count").value,10)||0, time:parseInt($("f-time").value,10)||0,
+    levels:$("f-levels").value.trim(), success:$("f-success").value.trim(), extra:$("f-extra").value.trim(), target:$("f-target").value};
+}
+
+/* ---------- prompt üretimi ---------- */
+function buildPrompt(d){
+  const name = d.name || `${d.topic || "Konu"} ${d.type}`;
+  const inter = d.inter.length ? [...d.inter] : ["pointer"];
+  if(inter.includes("hand") && !inter.includes("pointer")) inter.unshift("pointer");
+  const levels = d.levels ? d.levels.split("\n").map(s=>s.trim()).filter(Boolean) : [];
+  const libs = ["Tek bir HTML dosyası; CSS ve JavaScript dosyanın içinde.", "Arayüz dili Türkçe; Türkçe karakterler (ç, ğ, ı, İ, ö, ş, ü) doğru görünsün."];
+  if(inter.includes("hand")) libs.push("El takibi için yalnızca MediaPipe Hands CDN'i kullanılabilir; başka harici kütüphane gerekmez.");
+  libs.push("Çizim gerekiyorsa tam ekran <canvas>; ekran boyutu değişince yeniden ölçeklensin (sabit sanal alan, ör. 1600×900, oranı bozulmadan sığsın).");
+  libs.push("Akıllı tahtada (1920×1080) ve tablette (1024 px) rahat kullanılsın; yazılar uzaktan okunacak büyüklükte.");
+
+  const P = [];
+  P.push(`ROL\nSen ${d.branch} dersi için eğitsel ${d.type.toLowerCase()} geliştiren uzman bir front-end geliştirici ve öğretim tasarımcısısın.`);
+  P.push(`AMAÇ VE HEDEF KİTLE\n${d.grade} öğrencileri için "${name}" adlı bir ${d.type.toLowerCase()} yap.` +
+    (d.topic?`\nKonu: ${d.topic}.`:"") +
+    (d.goal?`\nKazanım: ${d.goal}`:"") +
+    (d.misc?`\nGidermesi gereken kavram yanılgısı: ${d.misc} En az bir görev bu yanılgıyı doğrudan sınasın.`:"") +
+    (d.time?`\nTahmini oynanma süresi: ${d.time} dakika.`:""));
+  P.push(`TEKNİK KISITLAR\n${libs.map(s=>"- "+s).join("\n")}`);
+  let flow = "OYUN AKIŞI\n1. Başlangıç ekranı: içeriğin adı, bir cümlelik amaç, nasıl oynanacağını gösteren kısa yönerge ve \"Başla\" düğmesi.";
+  if(levels.length){
+    flow += `\n2. Görevler sırayla:\n${levels.map((l,i)=>`   ${i+1}) ${l}`).join("\n")}`;
+  }else{
+    flow += `\n2. Kolaydan zora ${d.count||4} görev tasarla; her görevi tam olarak listele (görev metni, doğru cevap, ipucu).`;
+  }
+  flow += `\n3. Her görevde: görev panelinde ne yapılacağı yazsın, öğrenci etkileşir, sistem cevabı kontrol eder.`;
+  flow += d.success ? `\n4. Başarı ve hata: ${d.success}` : `\n4. Doğru cevapta olumlu animasyon ve kısa mesaj; yanlışta nedenini anlatan nazik bir mesaj ve tekrar deneme hakkı.`;
+  flow += `\n5. Son görevden sonra özet ekranı ve \"Baştan Oyna\" düğmesi.`;
+  P.push(flow);
+  P.push(`ETKİLEŞİM KURALLARI\n${inter.map(k=>"- "+INTER[k].rule).join("\n")}` + (inter.includes("hand")?"\n- Kamera açılamazsa oyun otomatik olarak fare/dokunma moduna geçsin.":""));
+  P.push(`GÖRSEL TASARIM\n${THEMES[d.theme].desc}\n- Tüm renkler CSS değişkenleri olarak tanımlansın.\n- Animasyonlar kısa (150–400 ms) ve prefers-reduced-motion ayarına saygılı olsun.`);
+  const fb = d.fb.length ? d.fb.map(k=>"- "+FB[k].rule).join("\n") : "- Doğru/yanlış durumlarında ekranın üst ortasında kısa süreli mesaj balonu.";
+  P.push(`GERİ BİLDİRİM\n${fb}\n- Mesajlar kısa, cesaretlendirici ve ${d.grade} düzeyine uygun Türkçe ile yazılsın.`);
+  P.push(`HATA DURUMLARI VE ERİŞİLEBİLİRLİK` +
+    (inter.includes("hand")?"\n- Kamera izni yok, kamera bulunamadı, kamerayı başka program kullanıyor, el takibi dosyaları yüklenemedi: her biri için ayrı ve anlaşılır Türkçe açıklama, \"Tekrar Dene\" ve \"Fare ile oyna\" seçenekleri.\n- Dosya doğrudan çift tıklanarak açılırsa kamera çalışmayabilir; bu durumda localhost (ör. VS Code Live Server) ile açma önerisi göster.":"") +
+    "\n- Renk tek başına bilgi taşımasın; doğru/yanlış simge ve metinle de belirtilsin.\n- Metin ve arka plan arasında yeterli kontrast olsun.");
+  if(d.extra) P.push(`EK İSTEKLER\n${d.extra}`);
+  P.push(`ÇIKTI FORMATI\nYalnızca eksiksiz, doğrudan tarayıcıda çalışan tek bir HTML dosyası ver. Kodun içinde bölümleri Türkçe yorum satırlarıyla ayır. Görev listesini kodun başında kolayca düzenlenebilen bir dizi olarak tut ki öğretmen yeni görev ekleyebilsin.` + (d.target==="Claude"?" Dosyayı artifact olarak oluştur.":""));
+  return P.join("\n\n");
+}
+
+const CHECKS = [
+  ["Tür", d=>!!d.type], ["Ders/sınıf", d=>!!d.branch&&!!d.grade], ["Konu", d=>!!d.topic], ["Kazanım", d=>d.goal.length>15],
+  ["Etkileşim", d=>d.inter.length>0], ["Görevler", d=>!!d.levels||d.count>0], ["Başarı/hata", d=>!!d.success], ["Geri bildirim", d=>d.fb.length>0]
+];
+let isExample = true, outEdited = false;
+function render(){
+  const d = getForm();
+  if(!outEdited) $("out").value = buildPrompt(d);
+  const res = CHECKS.map(([n,f])=>[n,f(d)]);
+  const ok = res.filter(r=>r[1]).length;
+  $("checks").innerHTML = res.map(([n,v])=>`<span class="${v?"on":""}">${v?"✓":"○"} ${n}</span>`).join("");
+  $("meterText").textContent = `${ok}/${CHECKS.length}`;
+  $("meterBar").style.width = (ok/CHECKS.length*100)+"%";
+  $("exTag").hidden = !isExample;
+}
+$("form").addEventListener("input", ()=>{ isExample=false; outEdited=false; render(); });
+$("form").addEventListener("change", ()=>{ isExample=false; outEdited=false; render(); });
+$("out").addEventListener("input", ()=>{ outEdited=true; });
+$("btnExample").onclick = ()=>{ setForm(EXAMPLE); isExample=true; outEdited=false; render(); toast("Örnek yüklendi"); };
+$("btnClear").onclick = ()=>{ setForm(BLANK); isExample=false; outEdited=false; render(); };
+
+/* ---------- ortak yardımcılar ---------- */
+let toastT;
+function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2200); }
+async function copy(textarea){
+  try{ await navigator.clipboard.writeText(textarea.value); toast("Panoya kopyalandı"); }
+  catch(e){ textarea.focus(); textarea.select(); toast("Metin seçildi; Ctrl+C ile kopyala"); }
+}
+$("btnCopy").onclick = ()=>copy($("out"));
+
+/* ---------- sekmeler ---------- */
+document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
+  ["design","analyze","saved"].forEach(t=>$("p-"+t).hidden = t!==b.dataset.tab);
+  if(b.dataset.tab==="saved") renderSaved();
+});
+
+/* ---------- kayıtlar (tarayıcıda) ---------- */
+const KEY="eia_saved_v1";
+function loadSaved(){ try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch(e){ return []; } }
+function storeSaved(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); return true; }catch(e){ return false; } }
+function save(title, sub, text){
+  const list = loadSaved(); list.unshift({id:Date.now(), title, sub, text, date:new Date().toLocaleDateString("tr-TR")});
+  if(storeSaved(list.slice(0,40))) toast("Kaydedildi"); else toast("Bu tarayıcıda kayıt yapılamıyor");
+  $("savedCount").textContent = loadSaved().length;
+}
+function renderSaved(){
+  const list = loadSaved(); $("savedCount").textContent = list.length;
+  const box = $("savedList"); box.innerHTML="";
+  if(!list.length){ box.innerHTML='<div class="empty">Henüz kayıtlı prompt yok. Üretilen bir promptun altındaki "Kaydet" ile buraya ekleyebilirsin. Kayıtlar yalnızca bu tarayıcıda tutulur.</div>'; return; }
+  list.forEach(it=>{
+    const row=document.createElement("div"); row.className="saved-item section";
+    const l=document.createElement("div"); const h=document.createElement("h3"); h.textContent=it.title; const p=document.createElement("p"); p.textContent=`${it.sub} · ${it.date}`; l.append(h,p);
+    const bs=document.createElement("div"); bs.className="btns";
+    const open=document.createElement("button"); open.className="btn"; open.textContent="Aç";
+    open.onclick=()=>{ $("t-design").click(); outEdited=true; isExample=false; $("out").value=it.text; $("exTag").hidden=true; toast("Prompt açıldı"); };
+    const cp=document.createElement("button"); cp.className="btn primary"; cp.textContent="Kopyala";
+    cp.onclick=async()=>{ try{ await navigator.clipboard.writeText(it.text); toast("Panoya kopyalandı"); }catch(e){ toast("Kopyalanamadı; önce Aç'a bas"); } };
+    const del=document.createElement("button"); del.className="btn ghost"; del.textContent="Sil";
+    del.onclick=()=>{ if(del.dataset.sure){ storeSaved(loadSaved().filter(x=>x.id!==it.id)); renderSaved(); } else { del.dataset.sure="1"; del.textContent="Emin misin?"; } };
+    bs.append(open,cp,del); row.append(l,bs); box.append(row);
+  });
+}
+$("btnSave").onclick = ()=>{ const d=getForm(); save(d.name||d.topic||"Adsız içerik", `${d.type} · ${d.branch} · ${d.grade}`, $("out").value); };
+
+/* ---------- HTML analizi (yerel) ---------- */
+let currentHTML = "", currentFile = "", lastScan = null;
+const LIBS = [
+  [/mediapipe\/hands/i,"MediaPipe Hands (el takibi)"],[/mediapipe\/(pose|holistic)/i,"MediaPipe Pose (vücut takibi)"],[/mediapipe\/face/i,"MediaPipe Face"],
+  [/tailwindcss/i,"Tailwind CSS"],[/font-awesome/i,"Font Awesome"],[/three(\.module)?(\.min)?\.js|\/three@/i,"Three.js (3B)"],
+  [/p5(\.min)?\.js|\/p5@/i,"p5.js"],[/chart(\.umd)?(\.min)?\.js|chart\.js/i,"Chart.js"],[/gsap/i,"GSAP"],[/matter(\.min)?\.js/i,"Matter.js (fizik)"],
+  [/phaser/i,"Phaser"],[/react(-dom)?(\.production)?/i,"React"],[/tensorflow|tfjs/i,"TensorFlow.js"],[/fonts\.googleapis/i,"Google Fonts"]
+];
+const FEATS = [
+  [/<canvas/i,"Canvas çizimi"],[/getUserMedia/,"Kamera / mikrofon"],[/AudioContext/,"Web Audio sesleri"],[/speechSynthesis/,"Sesli okuma"],
+  [/localStorage/,"Tarayıcıda kayıt"],[/requestAnimationFrame/,"Animasyon döngüsü"],[/pointerdown|mousedown|touchstart/,"Fare / dokunma"],
+  [/keydown|keyup/,"Klavye"],[/type=["']?range/i,"Kaydırıcılar"],[/dragstart|draggable/,"Sürükle-bırak (HTML5)"],[/devicePixelRatio/,"Yüksek çözünürlük desteği"],
+  [/addEventListener\(\s*["']resize/,"Ekran boyutuna uyum"]
+];
+function scan(html){
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const title = (doc.querySelector("title")||{}).textContent?.trim() || "(başlık yok)";
+  const lang = doc.documentElement.getAttribute("lang") || "belirtilmemiş";
+  const libs = [...new Set(LIBS.filter(([r])=>r.test(html)).map(x=>x[1]))];
+  const feats = FEATS.filter(([r])=>r.test(html)).map(x=>x[1]);
+  const colorCount = {};
+  (html.match(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g)||[]).forEach(c=>{ c=c.toLowerCase(); colorCount[c]=(colorCount[c]||0)+1; });
+  const colors = Object.entries(colorCount).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
+  const fonts = new Set();
+  (html.match(/font-family\s*:\s*([^;}"]+)/gi)||[]).forEach(f=>{ const n=f.split(":")[1].split(",")[0].replace(/['"]/g,"").trim(); if(n && !/^var\(/.test(n) && n.length<40) fonts.add(n); });
+  (html.match(/family=([^&:"']+)/g)||[]).forEach(f=>fonts.add(decodeURIComponent(f.slice(7)).replace(/\+/g," ")));
+  const heads = [...doc.querySelectorAll("h1,h2,h3")].map(e=>e.textContent.replace(/\s+/g," ").trim()).filter(Boolean).slice(0,8);
+  const buttons = [...new Set([...doc.querySelectorAll("button")].map(e=>e.textContent.replace(/\s+/g," ").trim()).filter(t=>t&&t.length<40))].slice(0,12);
+  const fnNames = [...new Set((html.match(/function\s+([A-Za-z_$][\w$]*)/g)||[]).map(s=>s.replace(/function\s+/,"")))];
+  const dataArrays = [...new Set((html.match(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\[/g)||[]).map(s=>s.replace(/(const|let|var)\s+|\s*=\s*\[/g,"")))].slice(0,10);
+  const lines = html.split("\n").length;
+  const kind = /level|stage|seviye|görev|asama|aşama/i.test(html) ? (/simül|simul|physics|fizik/i.test(html)?"Simülasyon / oyun":"Oyun (görev veya seviyeli)") : (/simül|simul/i.test(html)?"Simülasyon":"Etkileşimli sayfa / araç");
+  return {title, lang, libs, feats, colors, fonts:[...fonts].slice(0,6), heads, buttons, fnNames, dataArrays, lines, kind, size:html.length};
+}
+function addRow(dl, label, nodeOrText){ const dt=document.createElement("dt"); dt.textContent=label; const dd=document.createElement("dd"); if(typeof nodeOrText==="string") dd.textContent=nodeOrText; else dd.append(...nodeOrText); dl.append(dt,dd); }
+function tags(arr){ return arr.length? arr.map(t=>{ const s=document.createElement("span"); s.className="tag"; s.textContent=t; return s; }) : ["—"]; }
+function showFacts(s){
+  const dl=document.createElement("dl"); dl.className="facts";
+  addRow(dl,"Dosya", currentFile || "yapıştırılan kod");
+  addRow(dl,"Başlık", s.title);
+  addRow(dl,"Tahmini tür", s.kind);
+  addRow(dl,"Boyut", `${s.lines.toLocaleString("tr-TR")} satır · ${(s.size/1024).toFixed(1)} KB · dil: ${s.lang}`);
+  addRow(dl,"Kütüphaneler", tags(s.libs));
+  addRow(dl,"Özellikler", tags(s.feats));
+  addRow(dl,"Renkler", s.colors.length? s.colors.map(c=>{ const w=document.createElement("span"); w.className="swatch"; const i=document.createElement("i"); i.style.background=c; w.append(i, c); return w; }) : ["—"]);
+  addRow(dl,"Yazı tipleri", tags(s.fonts));
+  addRow(dl,"Başlıklar", tags(s.heads));
+  addRow(dl,"Düğmeler", tags(s.buttons));
+  addRow(dl,"Veri listeleri", tags(s.dataArrays));
+  addRow(dl,"Fonksiyonlar", `${s.fnNames.length} adet` + (s.fnNames.length? ": "+s.fnNames.slice(0,14).join(", ")+(s.fnNames.length>14?"…":""):""));
+  $("facts").innerHTML=""; $("facts").append(dl);
+}
+function quickPrompt(s){
+  const P=[];
+  P.push(`ROL\nSen eğitsel web içerikleri geliştiren uzman bir front-end geliştiricisin.`);
+  P.push(`AMAÇ\n"${s.title}" adlı ${s.kind.toLowerCase()} içeriğini sıfırdan, aynı davranış ve görünümle yeniden üret.` + (s.heads.length?`\nEkrandaki ana başlıklar: ${s.heads.join(" · ")}.`:""));
+  const tech=["Tek bir HTML dosyası; CSS ve JavaScript içinde.", `Arayüz dili: ${s.lang==="tr"?"Türkçe":s.lang}.`];
+  if(s.libs.length) tech.push(`Kullanılacak kütüphaneler (CDN): ${s.libs.join(", ")}.`);
+  P.push(`TEKNİK KISITLAR\n${tech.map(t=>"- "+t).join("\n")}`);
+  if(s.feats.length) P.push(`ÖZELLİKLER\n${s.feats.map(f=>"- "+f).join("\n")}`);
+  if(s.buttons.length) P.push(`ARAYÜZ DÜĞMELERİ\n${s.buttons.map(b=>"- "+b).join("\n")}`);
+  if(s.dataArrays.length) P.push(`VERİ YAPILARI\nKodda şu listeler var: ${s.dataArrays.join(", ")}. Görev/seviye verilerini kodun başında düzenlenebilir bir dizi olarak tut.`);
+  P.push(`GÖRSEL TASARIM\n` + (s.colors.length?`- Renk paleti: ${s.colors.join(", ")}.\n`:"") + (s.fonts.length?`- Yazı tipleri: ${s.fonts.join(", ")}.\n`:"") + `- Renkleri CSS değişkenleri olarak tanımla.`);
+  const imp=["Kamera kullanılıyorsa fare/dokunma yedeği ve anlaşılır hata mesajları ekle.","Ekran boyutu değişince düzen bozulmasın.","Klavye ile odaklanma görünür olsun."];
+  if(!s.feats.includes("Web Audio sesleri")) imp.push("Doğru/yanlış için kısa ses efektleri ekle.");
+  P.push(`İYİLEŞTİRMELER\n${imp.map(t=>"- "+t).join("\n")}`);
+  P.push(`ÇIKTI FORMATI\nYalnızca eksiksiz, çalışan tek bir HTML dosyası ver.`);
+  return P.join("\n\n");
+}
+const META = `ROL
+Sen eğitsel web oyunları konusunda uzman bir "tersine prompt mühendisisin". Hem yazılım geliştirici (HTML/CSS/JavaScript, Canvas, MediaPipe, Tailwind) hem de öğretim tasarımcısı gibi düşünürsün.
+
+GÖREV
+Aşağıdaki HTML dosyasını incele ve bu dosyayı (veya geliştirilmiş bir sürümünü) sıfırdan ürettirecek, bir yapay zekâya doğrudan verilebilecek TEK PARÇA bir prompt yaz.
+
+Promptta şu bölümler olsun, başlıklar BÜYÜK HARFLE:
+ROL · AMAÇ VE HEDEF KİTLE (ders, tahmini sınıf, kazanım) · TEKNİK KISITLAR (tek HTML, kütüphaneler ve CDN adresleri) · OYUN AKIŞI (adım adım; seviye veya görev listesinin TAMAMI) · ETKİLEŞİM KURALLARI (hareket → sonuç, eşik değerleri) · GÖRSEL TASARIM (renkler hex kodlu, düzen, animasyon) · GERİ BİLDİRİM (mesaj metinleri, sesler, başarı ekranı) · HATA DURUMLARI · İYİLEŞTİRMELER (kodda fark ettiğin hata ve eksiklerin çözümü) · ÇIKTI FORMATI ("Yalnızca eksiksiz, çalışan tek bir HTML dosyası ver.")
+
+KURALLAR
+- Kodu kopyalama; davranışı ve tasarımı tarif et. Sayıları, renkleri, ekrandaki Türkçe metinleri ve seviye listelerini koru.
+- Emin olmadığın yerleri "(varsayım)" diye işaretle.
+- Yalnızca promptu yaz; öncesinde veya sonrasında açıklama, kod bloğu işareti ya da selamlama olmasın.
+- Dil: Türkçe.
+
+ANALİZ EDİLECEK DOSYA:
+`;
+function runScan(){
+  const html = currentHTML || $("pasteIn").value;
+  if(!html.trim()){ $("aNote").className="note bad"; $("aNote").textContent="Önce bir HTML dosyası yükle ya da kodu yapıştır."; return; }
+  currentHTML = html;
+  lastScan = scan(html);
+  showFacts(lastScan);
+  $("aOut").value = quickPrompt(lastScan);
+  $("aMode").textContent = "Hızlı taslak";
+  ["aCopy","aSave","btnToForm"].forEach(id=>$(id).disabled=false);
+  $("aDeep").disabled = false;
+  $("aNote").className="note ok"; $("aNote").textContent = sample ? "Hızlı taslak hazır. Seviyeleri ve oyun akışını da içeren ayrıntılı prompt için \"Claude ile derin analiz\"e bas." : "Hızlı taslak hazır.";
+}
+$("btnScan").onclick = runScan;
+$("pasteIn").addEventListener("input", ()=>{ currentHTML=""; currentFile=""; });
+function readFile(f){
+  if(!f) return;
+  if(!/\.html?$/i.test(f.name) && f.type!=="text/html"){ $("aNote").className="note bad"; $("aNote").textContent="Bu bir HTML dosyası değil. .html uzantılı bir dosya seç."; return; }
+  const r=new FileReader(); r.onload=()=>{ currentHTML=String(r.result); currentFile=f.name; $("pasteIn").value=""; runScan(); toast(f.name+" okundu"); }; r.readAsText(f,"utf-8");
+}
+$("fileIn").onchange = e=>readFile(e.target.files[0]);
+const drop=$("drop");
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e=>readFile(e.dataTransfer.files[0]));
+$("aCopy").onclick = ()=>copy($("aOut"));
+$("aSave").onclick = ()=>save(lastScan?.title||"Analiz", `HTML analizi · ${currentFile||"yapıştırılan kod"}`, $("aOut").value);
+$("btnToForm").onclick = ()=>{
+  if(!lastScan) return;
+  const d = {...BLANK, name:lastScan.title.replace(/\s*[|–-].*$/,""), inter:[]};
+  if(lastScan.feats.includes("Fare / dokunma")) d.inter.push("pointer");
+  if(lastScan.libs.some(l=>/Hands/.test(l))) d.inter.push("hand");
+  if(lastScan.feats.includes("Klavye")) d.inter.push("keyboard");
+  if(lastScan.feats.includes("Kaydırıcılar")) d.inter.push("sliders");
+  if(!d.inter.length) d.inter=["pointer"];
+  d.type = /Simülasyon/.test(lastScan.kind) ? "Simülasyon" : "Oyun";
+  const dark = lastScan.colors.slice(0,3).some(c=>{ const h=c.length===4?c.replace(/#(.)(.)(.)/,"#$1$1$2$2$3$3"):c; const n=parseInt(h.slice(1),16); return ((n>>16)*.3+((n>>8)&255)*.59+(n&255)*.11)<60; });
+  d.theme = dark ? "neon" : "notebook";
+  d.fb = []; if(lastScan.feats.includes("Web Audio sesleri")) d.fb.push("sound");
+  d.extra = `"${lastScan.title}" dosyasındaki yapıyı temel al.`;
+  setForm(d); isExample=false; outEdited=false; render(); $("t-design").click(); toast("Forma aktarıldı; konu ve kazanımı tamamla");
+};
+
+/* ---------- Claude (sample) ---------- */
+let sample = null;
+const ERR = {
+  not_granted:"Bu sayfanın Claude'u kullanmasına izin verilmedi. Yerel prompt yine kullanılabilir.",
+  sampling_disabled:"Bu hesapta Claude kullanılamıyor.", rate_limited:"Çok sık istek gönderildi. Biraz bekleyip tekrar dene.",
+  session_expired:"Oturum süresi doldu. Claude'a yeniden giriş yap.", prompt_too_large:"Dosya çok büyük. Daha küçük bir dosya dene.",
+  refused:"Claude bu isteği yanıtlamadı. İçeriği değiştirip tekrar dene.", empty_completion:"Boş yanıt geldi. Tekrar dene.",
+  upstream_error:"Bağlantı kesildi. Tekrar dene."
+};
+const HIDE = ["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"];
+function setAI(on){
+  $("aiPill").classList.toggle("on", on);
+  $("aiPillText").textContent = on ? "Claude bağlı: zenginleştirme ve derin analiz açık" : "Yerel mod: promptlar tarayıcıda üretilir";
+  $("btnEnrich").hidden = !on; $("aDeep").hidden = !on;
+}
+setAI(false);
+(async()=>{ try{ sample = window.claude ? await window.claude.use("sample") : null; }catch(e){ sample=null; } setAI(!!sample); })();
+
+async function stream({input, outEl, noteEl, btn, stopBtn, label, onDone}){
+  const ctl = new AbortController();
+  const before = outEl.value;
+  btn.disabled = true; stopBtn.hidden = false; stopBtn.onclick = ()=>ctl.abort();
+  noteEl.className="note"; noteEl.textContent = "Claude düşünüyor… (ilk yanıt 10–60 saniye sürebilir)";
+  let got = false;
+  try{
+    const {truncated} = await sample(input, {signal:ctl.signal, cache:false, onText:({text})=>{ got=true; outEl.value=text; outEl.scrollTop=outEl.scrollHeight; noteEl.textContent="Yazılıyor…"; }});
+    noteEl.className="note ok"; noteEl.textContent = truncated ? "Yanıt uzunluk sınırında kesildi; sonunu kontrol et." : label;
+    onDone && onDone();
+  }catch(e){
+    if(e.code==="cancelled"){ noteEl.textContent = got ? "Durduruldu; yazılan kısım duruyor." : "Durduruldu."; if(!got) outEl.value=before; }
+    else{
+      if(e.text) outEl.value = e.text; else if(!got || e.code==="refused") outEl.value = before;
+      noteEl.className="note bad"; noteEl.textContent = ERR[e.code] || ERR.upstream_error;
+      if(HIDE.includes(e.code)){ sample=null; setAI(false); }
+    }
+  }finally{ btn.disabled=false; stopBtn.hidden=true; }
+}
+$("btnEnrich").onclick = ()=>{
+  if(!sample) return;
+  const d = getForm();
+  const input = `Aşağıda bir öğretmenin eğitsel ${d.type.toLowerCase()} için hazırladığı prompt var. Bu promptu, bir yapay zekânın tek seferde çalışan, öğretmenin sınıfta hemen kullanabileceği bir HTML dosyası üretebileceği şekilde ZENGİNLEŞTİR:
+- Görev listesi yoksa ya da eksikse, ${d.grade} düzeyine uygun, kolaydan zora tam görev listesini (görev metni, doğru cevap, ipucu) yaz.
+- Ekranda görünecek Türkçe metinleri (başlık, yönerge, doğru/yanlış mesajları, başarı kartı) somut olarak yaz.
+- Konuyla ilgili yaygın kavram yanılgılarını ve hangi görevin bunları sınadığını ekle.
+- Mevcut bölüm başlıklarını ve teknik kuralları koru; çelişen bir şey ekleme.
+Yalnızca geliştirilmiş promptun tamamını yaz; öncesinde ya da sonrasında açıklama, kod bloğu işareti olmasın. Dil: Türkçe.
+
+MEVCUT PROMPT:
+${$("out").value}`;
+  stream({input, outEl:$("out"), noteEl:$("note"), btn:$("btnEnrich"), stopBtn:$("btnStop"), label:"Prompt zenginleştirildi. Formu değiştirirsen yerel sürüme döner.", onDone:()=>{ outEdited=true; isExample=false; $("exTag").hidden=true; }});
+};
+$("aDeep").onclick = ()=>{
+  if(!sample || !currentHTML) return;
+  let html = currentHTML;
+  if(html.length > 150000) html = html.slice(0,150000) + "\n<!-- dosyanın geri kalanı kısaltıldı -->";
+  stream({input: META + html, outEl:$("aOut"), noteEl:$("aNote"), btn:$("aDeep"), stopBtn:$("aStop"), label:"Derin analiz tamamlandı. Promptu kopyalayıp yeni bir sohbete yapıştırabilirsin.", onDone:()=>{ $("aMode").textContent="Claude derin analizi"; }});
+};
+
+/* ---------- başlangıç ---------- */
+setForm(EXAMPLE); render();
+$("savedCount").textContent = loadSaved().length;
+</script>
+
+</body>
+</html>
