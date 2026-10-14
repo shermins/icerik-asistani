@@ -4,7 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Öğretmenler için ders oyunu ve simülasyon fikirlerini yapay zekâya hazır prompta dönüştüren araç.">
-<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<meta name="theme-color" content="#2747d6">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="İçerik Asistanı">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+body{margin:0}[hidden]{display:none!important}img{max-width:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.install-box{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ios-hint{font-size:13px;color:var(--muted);max-width:280px;line-height:1.4}
+</style>
 </head>
 <body>
 <title>Etkileşimli İçerik Asistanı</title>
@@ -609,5 +622,45 @@ setForm(EXAMPLE); render();
 $("savedCount").textContent = loadSaved().length;
 </script>
 
+<script>
+/* ---------- Telefona yüklenebilir uygulama (PWA) ---------- */
+(function(){
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(()=>{}));
+  }
+  /* Claude dışında yapay zekâ özelliği yok: bilgi rozetini gizle */
+  const pill = document.getElementById("aiPill");
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+
+  const box = document.createElement("div");
+  box.className = "install-box";
+  const btn = document.createElement("button");
+  btn.className = "btn primary"; btn.type = "button"; btn.hidden = true;
+  btn.textContent = "📲 Telefona yükle";
+  const hint = document.createElement("div");
+  hint.className = "ios-hint"; hint.hidden = true;
+  hint.textContent = "Telefona yüklemek için: Safari'de alttaki Paylaş simgesine dokun, sonra “Ana Ekrana Ekle”yi seç.";
+  box.append(btn, hint);
+  if (pill) { pill.hidden = true; pill.after(box); }
+
+  if (standalone) return;
+
+  let deferred = null;
+  window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault(); deferred = e; btn.hidden = false;
+  });
+  btn.addEventListener("click", async () => {
+    if (!deferred) return;
+    deferred.prompt();
+    const choice = await deferred.userChoice;
+    if (choice.outcome === "accepted") btn.hidden = true;
+    deferred = null;
+  });
+  window.addEventListener("appinstalled", () => { btn.hidden = true; });
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (isIOS) hint.hidden = false;
+})();
+</script>
 </body>
 </html>
