@@ -129,6 +129,23 @@ textarea{resize:vertical; min-height:70px}
 .saved-item{display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center}
 .saved-item h3{font-family:var(--f-display); font-size:16px; margin:0}
 .saved-item p{margin:2px 0 0; font-size:13px; color:var(--muted)}
+.guide-head{margin-bottom:16px}
+.guide-head h2{font-family:var(--f-display); font-size:clamp(20px,3vw,26px); font-weight:800; margin:0; text-wrap:balance}
+.guide-head p{margin:4px 0 0; color:var(--muted)}
+.steps{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr)); gap:16px}
+.step-card{display:flex; gap:16px; align-items:flex-start}
+.step-card .num{flex:none; width:40px; height:40px; border-radius:50%; background:var(--accent); color:var(--accent-ink); font:800 19px var(--f-display); display:grid; place-items:center}
+.step-body{min-width:0}
+.step-body h3{font-family:var(--f-display); font-size:18px; margin:6px 0 8px}
+.step-body p{margin:0 0 8px}
+.tips{margin:6px 0 0; padding-left:18px; display:grid; gap:6px; font-size:14px}
+.mini{margin:0 0 8px; padding-left:20px; display:grid; gap:5px; font-size:14.5px}
+.say{font-family:var(--f-mono); font-size:13px; background:var(--accent-soft); color:var(--accent); padding:1px 6px; border-radius:5px}
+.faq{margin-top:16px}
+.faq h3{font-family:var(--f-display); font-size:18px; margin:0 0 8px}
+.faq details{border-top:1px dashed var(--line); padding:10px 0}
+.faq summary{cursor:pointer; font-weight:600}
+.faq details p{margin:8px 0 0; color:var(--ink)}
 .toast{position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 18px); transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:10px 16px; border-radius:10px; font-size:14px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .2s}
 .toast.show{opacity:1}
 @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
@@ -146,6 +163,7 @@ textarea{resize:vertical; min-height:70px}
     <button role="tab" id="t-design" aria-selected="true" data-tab="design">Yeni İçerik Tasarla</button>
     <button role="tab" id="t-analyze" aria-selected="false" data-tab="analyze">HTML'den Prompt Çıkar</button>
     <button role="tab" id="t-saved" aria-selected="false" data-tab="saved">Kayıtlı Promptlar <span class="count" id="savedCount">0</span></button>
+    <button role="tab" id="t-guide" aria-selected="false" data-tab="guide">Promptu Kullan</button>
   </nav>
 
   <!-- ================= TASARLA ================= -->
@@ -212,6 +230,7 @@ textarea{resize:vertical; min-height:70px}
         <button class="btn" id="btnEnrich" hidden>Claude ile zenginleştir</button>
         <button class="btn" id="btnStop" hidden>Durdur</button>
         <button class="btn" id="btnSave">Kaydet</button>
+        <button class="btn ghost" id="btnNext">Sonraki adımlar →</button>
       </div>
       <p class="note" id="note">Form her değiştiğinde prompt kendiliğinden güncellenir. Metni burada da düzenleyebilirsin.</p>
     </aside>
@@ -248,6 +267,77 @@ textarea{resize:vertical; min-height:70px}
       </div>
       <p class="note" id="aNote">Hızlı taslak tarayıcıda hemen hazırlanır. Derin analiz, oyunun akışını ve seviyelerini de okuyup daha ayrıntılı bir prompt yazar.</p>
     </aside>
+  </section>
+
+  <!-- ================= REHBER ================= -->
+  <section id="p-guide" hidden>
+    <div class="guide-head">
+      <h2>Promptu aldın, şimdi ne yapacaksın?</h2>
+      <p>Dört adımda prompttan sınıfta oynanan oyuna. İlk denemen 15–20 dakika sürer, sonrakiler 5 dakika.</p>
+    </div>
+    <ol class="steps">
+      <li class="card step-card">
+        <span class="num">1</span>
+        <div class="step-body">
+          <h3>Promptu yapay zekâya ver</h3>
+          <p>"Yeni İçerik Tasarla" sekmesinde <b>Kopyala</b>'ya bas. Claude, ChatGPT ya da Gemini'de <b>yeni bir sohbet</b> aç, promptu yapıştır ve gönder.</p>
+          <ul class="tips">
+            <li><b>Claude:</b> Oyun çoğu zaman sağ tarafta çalışır hâlde açılır. Hemen deneyebilirsin.</li>
+            <li><b>ChatGPT ve Gemini:</b> Kod uzun bir kutuda gelir. Kutunun köşesindeki kopyala simgesine bas.</li>
+            <li>Kod yarıda kesilirse aynı sohbete <span class="say">devam et</span> yaz.</li>
+          </ul>
+        </div>
+      </li>
+      <li class="card step-card">
+        <span class="num">2</span>
+        <div class="step-body">
+          <h3>Kodu dosya olarak kaydet</h3>
+          <p><b>Windows'ta Not Defteri ile:</b></p>
+          <ol class="mini">
+            <li>Not Defteri'ni aç ve kodu yapıştır.</li>
+            <li><b>Dosya → Farklı Kaydet</b>'e tıkla.</li>
+            <li><b>Kayıt türü:</b> <span class="say">Tüm Dosyalar</span> seç.</li>
+            <li><b>Dosya adı:</b> <span class="say">kesir-oyunu.html</span> gibi, sonu <b>.html</b> ile bitsin.</li>
+            <li><b>Kodlama:</b> <span class="say">UTF-8</span> seçili olsun. Yoksa Türkçe harfler bozulur.</li>
+          </ol>
+          <p class="hint">Mac'te TextEdit'te önce <b>Biçim → Düz Metin Yap</b>, sonra .html uzantısıyla kaydet.</p>
+        </div>
+      </li>
+      <li class="card step-card">
+        <span class="num">3</span>
+        <div class="step-body">
+          <h3>Aç ve dene</h3>
+          <p>Kaydettiğin dosyaya çift tıkla; tarayıcıda açılır. Bir öğrenci gibi baştan sona oyna: her görevi bitir, bilerek yanlış yap, ipucuna bas.</p>
+          <ul class="tips">
+            <li><b>Bir şey bozuksa</b> aynı sohbete gördüğünü yaz: <span class="say">3. görevde dilim yerine oturmuyor, düzelt ve kodun tamamını yeniden ver.</span></li>
+            <li><b>Kamera kullanan oyunlar</b> dosyadan açılınca kamera izni vermeyebilir. Oyun yine fareyle çalışır; kamera için 4. adımdaki gibi internete yükle.</li>
+          </ul>
+        </div>
+      </li>
+      <li class="card step-card">
+        <span class="num">4</span>
+        <div class="step-body">
+          <h3>Öğrencilerle paylaş</h3>
+          <p><b>Akıllı tahtada:</b> Dosyayı USB bellekle tahtaya at ve çift tıkla.</p>
+          <p><b>Bağlantı olarak (ücretsiz):</b></p>
+          <ol class="mini">
+            <li>Dosyanın adını <span class="say">index.html</span> yap.</li>
+            <li><b>github.com/new</b> adresinden yeni bir depo aç ve dosyayı yükle (Add file → Upload files).</li>
+            <li><b>vercel.com</b>'a GitHub ile gir, depoyu <b>Import</b> et, <b>Deploy</b>'a bas.</li>
+            <li>Çıkan <b>…vercel.app</b> adresini öğrencilere gönder. Telefonda, tablette, bilgisayarda açılır; kamera da çalışır.</li>
+          </ol>
+          <p class="hint">Claude kullandıysan oyunun açıldığı panelden de paylaşım bağlantısı alabilirsin.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="card faq">
+      <h3>Sık karşılaşılan sorunlar</h3>
+      <details><summary>Türkçe harfler bozuk görünüyor (ÅŸ, Ä± gibi)</summary><p>Dosyayı Not Defteri'nde aç, <b>Farklı Kaydet</b>'te <b>Kodlama: UTF-8</b> seçip yeniden kaydet.</p></details>
+      <details><summary>Dosyaya çift tıklayınca Not Defteri açılıyor</summary><p>Dosya adı <b>.html.txt</b> olmuş olabilir. Farklı Kaydet'te <b>Kayıt türü: Tüm Dosyalar</b> seçip yeniden kaydet. Ya da dosyaya sağ tıkla → <b>Birlikte aç → Chrome</b>.</p></details>
+      <details><summary>Sayfa bembeyaz açılıyor</summary><p>Kod eksik kopyalanmış olabilir. Kodun en son satırının <b>&lt;/html&gt;</b> olduğunu kontrol et. Değilse yapay zekâya <span class="say">kodun tamamını tek seferde yeniden ver</span> yaz.</p></details>
+      <details><summary>Oyun çalışıyor ama istediğim gibi değil</summary><p>Baştan başlamana gerek yok. Aynı sohbette neyi değiştirmek istediğini tek tek yaz: <span class="say">yazıları büyüt</span>, <span class="say">5 görev daha ekle</span>, <span class="say">renkleri daha canlı yap</span>. Her seferinde kodun tamamını istemeyi unutma.</p></details>
+    </div>
   </section>
 
   <!-- ================= KAYITLI ================= -->
@@ -395,11 +485,12 @@ async function copy(textarea){
   catch(e){ textarea.focus(); textarea.select(); toast("Metin seçildi; Ctrl+C ile kopyala"); }
 }
 $("btnCopy").onclick = ()=>copy($("out"));
+$("btnNext").onclick = ()=>{ $("t-guide").click(); window.scrollTo({top:0, behavior:"smooth"}); };
 
 /* ---------- sekmeler ---------- */
 document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("nav.tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));
-  ["design","analyze","saved"].forEach(t=>$("p-"+t).hidden = t!==b.dataset.tab);
+  ["design","analyze","saved","guide"].forEach(t=>$("p-"+t).hidden = t!==b.dataset.tab);
   if(b.dataset.tab==="saved") renderSaved();
 });
 
